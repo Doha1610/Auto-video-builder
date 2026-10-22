@@ -57,10 +57,31 @@
                 </button>
             </div>
 
-            <!-- 1. Nhập kịch bản -->
+            <!-- 1. Nguồn âm thanh (Văn bản hoặc File) -->
             <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
-                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">1. Nhập kịch bản (Văn bản)</h2>
-                <textarea id="scriptText" rows="5" placeholder="Dán đoạn văn bản cần đọc vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-accent focus:outline-none"></textarea>
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">1. Nguồn Âm thanh</h2>
+                
+                <div class="flex gap-6 mb-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="audioSource" value="text" checked class="text-accent focus:ring-accent w-4 h-4">
+                        <span class="text-sm font-medium">Tạo giọng đọc (TTS)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="audioSource" value="file" class="text-accent focus:ring-accent w-4 h-4">
+                        <span class="text-sm font-medium">Tải file Audio có sẵn</span>
+                    </label>
+                </div>
+
+                <!-- Khu vực nhập text -->
+                <div id="textInputSection">
+                    <textarea id="scriptText" rows="5" placeholder="Dán đoạn văn bản cần đọc vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-accent focus:outline-none"></textarea>
+                </div>
+
+                <!-- Khu vực tải file audio -->
+                <div id="fileInputSection" class="hidden">
+                    <input type="file" id="audioFileInput" accept="audio/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 cursor-pointer"/>
+                    <p class="text-xs text-slate-500 mt-2">Hỗ trợ định dạng .mp3, .wav, .m4a...</p>
+                </div>
             </section>
 
             <!-- 2. Cấu hình Video -->
@@ -74,10 +95,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1.5">Giọng đọc</label>
+                        <label class="block text-xs text-slate-400 mb-1.5">Giọng đọc (TTS)</label>
                         <select id="voiceType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
-                            <option value="ngoc_huyen">Ngọc Huyền (KorvaTTS - Cực hay)</option>
-                            <option value="clone_ngoc_huyen">Ngọc Huyền (Clone từ file mp3)</option>
+                            <option value="clone_ngoc_huyen">Ngọc Huyền (Clone từ file mẫu)</option>
                             <option value="vi-VN-HoaiMyNeural">Nữ - HoaiMy (Miền Nam)</option>
                             <option value="vi-VN-NamMinhNeural">Nam - NamMinh (Miền Bắc)</option>
                         </select>
@@ -88,7 +108,7 @@
                 </button>
             </section>
 
-            <!-- Progress và Log cho Tab Tạo Video (Bao gồm cả log tải video) -->
+            <!-- Progress và Log cho Tab Tạo Video -->
             <section id="renderProgressSection" class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800 hidden">
                 <div class="flex items-center justify-between mb-2">
                     <span id="renderStatusText" class="text-sm text-slate-300">Đang xử lý...</span>
@@ -197,7 +217,7 @@
 
     </div>
 
-    <!-- Đổi version để xóa cache -->
-    <script src="app.js?v=1005"></script>
+    <!-- Đổi version để xóa cache khi cập nhật code -->
+    <script src="app.js?v=1006"></script>
 </body>
 </html>
