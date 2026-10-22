@@ -1,6 +1,6 @@
 # 🎬 Auto Video Studio
 
-Hệ thống tự động hóa video audio hàng loạt từ văn bản hoặc file âm thanh có sẵn. Dự án kết hợp sức mạnh của AI (Whisper, Edge-TTS, VieNeu-TTS) và FFmpeg để tạo ra những video có giọng đọc hoàn chỉnh chỉ từ một đoạn kịch bản và danh sách link trên Google Sheet.
+Hệ thống tự động hóa video audio từ văn bản hoặc file âm thanh có sẵn. Dự án kết hợp sức mạnh của AI (Whisper, Edge-TTS, VieNeu-TTS) và FFmpeg để tạo ra những video có giọng đọc hoàn chỉnh chỉ từ một đoạn kịch bản và danh sách link trên Google Sheet.
 
 ## ✨ Tính năng chính
 
