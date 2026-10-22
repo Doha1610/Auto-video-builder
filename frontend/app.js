@@ -31,6 +31,27 @@ $("tab-btn-transcribe").addEventListener("click", () => {
 // LOGIC TAB 1: TẠO VIDEO
 // ==========================================
 
+// Xử lý ẩn/hiện khu vực nhập liệu (Text vs File)
+document.querySelectorAll('input[name="audioSource"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const textSection = $('textInputSection');
+        const fileSection = $('fileInputSection');
+        const voiceSelect = $('voiceType');
+        
+        if (e.target.value === 'text') {
+            textSection.classList.remove('hidden');
+            fileSection.classList.add('hidden');
+            voiceSelect.disabled = false;
+            voiceSelect.classList.remove('opacity-50');
+        } else {
+            textSection.classList.add('hidden');
+            fileSection.classList.remove('hidden');
+            voiceSelect.disabled = true;
+            voiceSelect.classList.add('opacity-50');
+        }
+    });
+});
+
 // Tải danh sách Topic
 async function loadTopics() {
     try {
@@ -57,7 +78,6 @@ $("startDownloadBtn").addEventListener("click", async () => {
         const res = await fetch(`${API}/api/download-sheet`, { method: "POST" });
         const data = await res.json();
         
-        // Polling log tiến trình tải
         const timer = setInterval(async () => {
             const pRes = await fetch(`${API}/api/progress/${data.job_id}`);
             const pData = await pRes.json();
@@ -79,152 +99,282 @@ $("startDownloadBtn").addEventListener("click", async () => {
         }, 1000);
         
     } catch (e) {
-        alert("Lỗi: " + e.message); btn.disabled = false;
+        alert("Lỗi: " + e.message); btn.disabled = false; btn.textContent = "📥 Tải video mới từ Google Sheet";
     }
 });
 
 // Nút "Bắt đầu tạo Video"
 $("startRenderBtn").addEventListener("click", async () => {
+    const sourceType = document.querySelector('input[name="audioSource"]:checked').value;
     const text = $("scriptText").value.trim();
     const topic = $("videoTopic").value;
     const voice = $("voiceType").value;
+    const fileInput = $("audioFileInput");
 
-    if (!text) { alert("Vui lòng nhập kịch bản!"); return; }
+    // Kiểm tra dữ liệu đầu vào
+    if (sourceType === 'text' && !text) { 
+        alert("Vui lòng nhập kịch bản!"); 
+        return; 
+    }
+    if (sourceType === 'file' && fileInput.files.length === 0) {
+        alert("Vui lòng chọn file audio!");
+        return;
+    }
 
     const btn = $("startRenderBtn");
-    btn.disabled = true; btn.textContent = "⏳ Đang xử lý...";
+    btn.disabled = true; btn.textContent = "⏳ Đang xử lý (vui lòng đợi)...";
 
     $("renderProgressSection").classList.remove("hidden");
     $("renderResultSection").classList.add("hidden");
     $("renderProgressBar").style.width = "0%";
+    $("renderProgressPct").textContent = "0%";
     $("renderLogBox").textContent = "";
     lastRenderLog = 0;
 
     try {
+        // Đóng gói dữ liệu vào FormData (để gửi được file)
+        const formData = new FormData();
+        formData.append("source_type", sourceType);
+        formData.append("topic", topic);
+        
+        if (sourceType === 'text') {
+            formData.append("text", text);
+            formData.append("voice", voice);
+        } else {
+            formData.append("audio_file", fileInput.files[0]);
+        }
+
         const res = await fetch(`${API}/api/render-video`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, topic, voice })
+            method: "POST", 
+            body: formData 
         });
         
         const data = await res.json();
-        renderJobId = data.job_id;
+        if (!res.ok) throw new Error(data.detail || "Lỗi gọi API");
         
-        renderTimer = setInterval(async () => {
-            const pRes = await fetch(`${API}/api/progress/${renderJobId}?since=${lastRenderLog}`);
-            const pData = await pRes.json();
+        renderJobId = data.job_id;
+        startRenderPolling();
 
-            if (pData.logs && pData.logs.length > 0) {
-                pData.logs.forEach(l => $("renderLogBox").textContent += `[${fmtTime(l.t)}] ${l.msg}\n`);
-                $("renderLogBox").scrollTop = $("renderLogBox").scrollHeight;
-                lastRenderLog = pData.log_count;
-            }
-
-            if (typeof pData.progress === "number") {
-                $("renderProgressBar").style.width = pData.progress + "%";
-                $("renderProgressPct").textContent = pData.progress.toFixed(1) + "%";
-            }
-
-            if (pData.status === "done") {
-                clearInterval(renderTimer);
-                $("renderStatusText").textContent = "✅ Hoàn tất!";
-                $("renderResultSection").classList.remove("hidden");
-                $("finalVideoPlayer").src = `${API}${pData.result.video_url}`;
-                $("downloadVideoBtn").href = `${API}${pData.result.video_url}`;
-                btn.disabled = false; btn.textContent = "🚀 Bắt đầu tạo Video";
-            } else if (pData.status === "error") {
-                clearInterval(renderTimer);
-                alert("Lỗi: " + pData.error); btn.disabled = false; btn.textContent = "🚀 Bắt đầu tạo Video";
-            }
-        }, 1000);
     } catch (e) {
-        alert("Lỗi kết nối API"); btn.disabled = false; btn.textContent = "🚀 Bắt đầu tạo Video";
+        alert("Lỗi: " + e.message);
+        resetRenderBtn();
     }
 });
 
+// Hàm kiểm tra tiến độ (Polling) cho Tạo Video
+function startRenderPolling() {
+    if (renderTimer) clearInterval(renderTimer);
+
+    renderTimer = setInterval(async () => {
+        try {
+            const res = await fetch(`${API}/api/progress/${renderJobId}?since=${lastRenderLog}`);
+            const data = await res.json();
+
+            if (data.logs && data.logs.length > 0) {
+                const box = $("renderLogBox");
+                data.logs.forEach(l => {
+                    box.textContent += `[${fmtTime(l.t)}] ${l.msg}\n`;
+                });
+                box.scrollTop = box.scrollHeight;
+                lastRenderLog = data.log_count;
+            }
+
+            if (typeof data.progress === "number") {
+                const pct = Math.min(data.progress, 100);
+                $("renderProgressBar").style.width = pct + "%";
+                $("renderProgressPct").textContent = pct.toFixed(1) + "%";
+                $("renderStatusText").textContent = `Đang xử lý... ${pct.toFixed(1)}%`;
+            }
+
+            if (data.status === "done") {
+                clearInterval(renderTimer);
+                $("renderStatusText").textContent = "✅ Hoàn tất!";
+                
+                $("renderResultSection").classList.remove("hidden");
+                $("finalVideoPlayer").src = `${API}${data.result.video_url}`;
+                $("downloadVideoBtn").href = `${API}${data.result.video_url}`;
+                resetRenderBtn();
+                
+            } else if (data.status === "error") {
+                clearInterval(renderTimer);
+                alert("Lỗi xử lý: " + data.error);
+                resetRenderBtn();
+            }
+
+        } catch (e) {
+            console.error("Lỗi polling:", e);
+        }
+    }, 1000);
+}
+
+function resetRenderBtn() {
+    const btn = $("startRenderBtn");
+    btn.disabled = false;
+    btn.textContent = "🚀 Bắt đầu tạo Video";
+}
+
 
 // ==========================================
-// LOGIC TAB 2: WHISPER
+// LOGIC TAB 2: WHISPER (LẤY VĂN BẢN)
 // ==========================================
 
 $("startBtn").addEventListener("click", startTranscribe);
-$("openFolderBtn").addEventListener("click", async () => {
-    try { await fetch(`${API}/api/open-output`); } catch (e) { alert("Lỗi mở thư mục"); }
-});
+$("openFolderBtn").addEventListener("click", openFolder);
 $("spellCheckBtn").addEventListener("click", spellCheck);
 
-$("url").addEventListener("keydown", (e) => { if (e.key === "Enter") startTranscribe(); });
+$("url").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") startTranscribe();
+});
 
 async function startTranscribe() {
     const url = $("url").value.trim();
-    if (!url) { alert("Bạn chưa nhập URL."); return; }
+    if (!url) {
+        alert("Bạn chưa nhập URL.");
+        return;
+    }
 
     const model = $("model").value;
     const language = $("language").value || null;
 
-    $("startBtn").disabled = true; $("startBtn").textContent = "⏳ Đang xử lý...";
+    $("startBtn").disabled = true;
+    $("startBtn").textContent = "⏳ Đang xử lý...";
     $("progressSection").classList.remove("hidden");
     $("logSection").classList.remove("hidden");
     $("resultSection").classList.add("hidden");
-    $("logBox").textContent = ""; $("progressBar").style.width = "0%"; lastTranscribeLog = 0;
+    $("logBox").textContent = "";
+    $("progressBar").style.width = "0%";
+    $("progressPct").textContent = "0%";
+    $("statusText").textContent = "Đang khởi động...";
+    lastTranscribeLog = 0;
 
     try {
         const res = await fetch(`${API}/api/process`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url, model, language }),
         });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Lỗi HTTP ${res.status}`);
+        }
+
         const data = await res.json();
         transcribeJobId = data.job_id;
-        
-        transcribeTimer = setInterval(async () => {
-            const pRes = await fetch(`${API}/api/progress/${transcribeJobId}?since=${lastTranscribeLog}`);
-            const pData = await pRes.json();
-
-            if (pData.logs && pData.logs.length) {
-                const box = $("logBox");
-                pData.logs.forEach(l => box.textContent += `[${fmtTime(l.t)}] ${l.msg}\n`);
-                box.scrollTop = box.scrollHeight;
-                lastTranscribeLog = pData.log_count;
-            }
-
-            if (typeof pData.progress === "number") {
-                $("progressBar").style.width = pData.progress + "%";
-                $("progressPct").textContent = pData.progress.toFixed(1) + "%";
-            }
-
-            if (pData.status === "done") {
-                clearInterval(transcribeTimer);
-                $("resultSection").classList.remove("hidden");
-                $("downloadTxt").href = `${API}/api/download/${transcribeJobId}/txt`;
-                $("downloadSrt").href = `${API}/api/download/${transcribeJobId}/srt`;
-                $("resultText").value = pData.result.text || "";
-                $("startBtn").disabled = false; $("startBtn").textContent = "🚀 Bắt đầu";
-            } else if (pData.status === "error") {
-                clearInterval(transcribeTimer);
-                alert("Lỗi: " + pData.error);
-                $("startBtn").disabled = false; $("startBtn").textContent = "🚀 Bắt đầu";
-            }
-        }, 800);
+        $("statusText").textContent = `Đang xử lý (job ${transcribeJobId})...`;
+        pollProgress();
     } catch (e) {
-        alert("Lỗi: " + e.message); $("startBtn").disabled = false; $("startBtn").textContent = "🚀 Bắt đầu";
+        alert("Lỗi: " + e.message);
+        resetTranscribeUI();
+    }
+}
+
+function pollProgress() {
+    if (!transcribeJobId) return;
+
+    if (transcribeTimer) clearInterval(transcribeTimer);
+
+    transcribeTimer = setInterval(async () => {
+        try {
+            const res = await fetch(
+                `${API}/api/progress/${transcribeJobId}?since=${lastTranscribeLog}`
+            );
+            if (!res.ok) return;
+
+            const data = await res.json();
+
+            if (data.logs && data.logs.length) {
+                const box = $("logBox");
+                data.logs.forEach((l) => {
+                    box.textContent += `[${fmtTime(l.t)}] ${l.msg}\n`;
+                });
+                box.scrollTop = box.scrollHeight;
+                lastTranscribeLog = data.log_count;
+            }
+
+            if (typeof data.progress === "number") {
+                const pct = Math.min(data.progress, 100);
+                $("progressBar").style.width = pct + "%";
+                $("progressPct").textContent = pct.toFixed(1) + "%";
+                $("statusText").textContent = `Đang xử lý... ${pct.toFixed(1)}%`;
+            }
+
+            if (data.status === "done") {
+                clearInterval(transcribeTimer);
+                $("statusText").textContent = "✅ Hoàn tất!";
+                showTranscribeResult(data.result);
+                resetTranscribeUI();
+            } else if (data.status === "error") {
+                clearInterval(transcribeTimer);
+                $("statusText").textContent = "❌ Lỗi";
+                alert("Lỗi: " + data.error);
+                resetTranscribeUI();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }, 800);
+}
+
+function showTranscribeResult(result) {
+    if (!result) return;
+    $("resultSection").classList.remove("hidden");
+    $("downloadTxt").href = `${API}/api/download/${transcribeJobId}/txt`;
+    $("downloadSrt").href = `${API}/api/download/${transcribeJobId}/srt`;
+    $("resultText").value = result.text || "";
+}
+
+function resetTranscribeUI() {
+    $("startBtn").disabled = false;
+    $("startBtn").textContent = "🚀 Bắt đầu";
+}
+
+async function openFolder() {
+    try {
+        await fetch(`${API}/api/open-output`);
+    } catch (e) {
+        alert("Không mở được thư mục. Backend đã chạy chưa?");
     }
 }
 
 async function spellCheck() {
-    if (!transcribeJobId) return;
+    if (!transcribeJobId) {
+        alert("Chưa có kết quả để kiểm tra.");
+        return;
+    }
+
     const btn = $("spellCheckBtn");
-    btn.disabled = true; btn.textContent = "⏳ Đang sửa...";
+    btn.disabled = true;
+    btn.textContent = "⏳ Đang sửa...";
 
     try {
-        const res = await fetch(`${API}/api/correct/${transcribeJobId}`, { method: "POST" });
+        const res = await fetch(`${API}/api/correct/${transcribeJobId}`, {
+            method: "POST",
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Lỗi HTTP ${res.status}`);
+        }
+
         const data = await res.json();
         $("resultText").value = data.text || "";
+        $("statusText").textContent = "✅ Đã kiểm tra chính tả!";
         btn.textContent = "✅ Đã sửa";
-        setTimeout(() => { btn.textContent = "✏️ Kiểm tra chính tả"; btn.disabled = false; }, 2000);
+
+        setTimeout(() => {
+            btn.textContent = "✏️ Kiểm tra chính tả";
+            btn.disabled = false;
+        }, 2000);
+
     } catch (e) {
-        alert("Lỗi sửa chính tả"); btn.textContent = "✏️ Kiểm tra chính tả"; btn.disabled = false;
+        alert("Lỗi: " + e.message);
+        btn.textContent = "✏️ Kiểm tra chính tả";
+        btn.disabled = false;
     }
 }
 
+// Hàm phụ trợ format thời gian
 function fmtTime(sec) {
     return new Date(sec * 1000).toLocaleTimeString("vi-VN");
 }
