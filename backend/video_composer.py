@@ -23,10 +23,7 @@ def compose_random_video(videos_dir: str, output_path: str, target_duration: flo
         print("❌ Không có video nào để ghép!")
         return False
 
-    if topic_filter:
-        print(f"[Composer] (Lưu ý: Đang bỏ qua bộ lọc topic '{topic_filter}' vì file tải về chưa có tag)")
-
-    # 2. Chọn ngẫu nhiên video cho đến khi đủ thời lượng
+    # 2. Chọn ngẫu nhiên video cho đến khi đủ thời lượng (Tự động loop nếu thiếu)
     selected_videos = []
     current_duration = 0.0
     
@@ -62,9 +59,10 @@ def compose_random_video(videos_dir: str, output_path: str, target_duration: flo
     
     with open(temp_list_file, "w", encoding="utf-8") as f:
         for item in selected_videos:
-            # SỬ DỤNG ĐƯỜNG DẪN TUYỆT ĐỐI ĐỂ TRÁNH LỖI KHÔNG TÌM THẤY FILE
+            # Lấy đường dẫn tuyệt đối, thay \ thành /
             abs_path = os.path.abspath(item["path"]).replace("\\", "/")
             
+            # Bọc trong dấu nháy đơn để xử lý tên file có khoảng trắng/tiếng Việt
             if item["trim"] is not None:
                 f.write(f"file '{abs_path}'\n")
                 f.write(f"duration {item['trim']:.3f}\n")
@@ -75,20 +73,24 @@ def compose_random_video(videos_dir: str, output_path: str, target_duration: flo
     print("[Composer] Đang ghép video bằng FFmpeg (quá trình này có thể mất vài phút)...")
     ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe")
     
-    # Ép chuẩn hóa video/audio để tránh lỗi treo khi ghép các video khác định dạng
+    # ÉP BUỘC RENDER LẠI (Re-encode) ĐỂ ĐỒNG NHẤT ÂM THANH VÀ HÌNH ẢNH
+    # Điều này giúp sửa lỗi "Conversion failed" khi video gốc (Facebook/TikTok) bị lỗi codec
     cmd = [
         ffmpeg_exe,
         "-y",                   
         "-f", "concat",         
         "-safe", "0",           
         "-i", temp_list_file,
-        "-c:v", "libx264",      # Render lại video sang H.264
-        "-c:a", "aac",          # Render lại audio sang AAC
-        "-pix_fmt", "yuv420p",  # Đảm bảo tương thích
+        "-c:v", "libx264",       # Render lại video sang H.264
+        "-preset", "fast",       # Tốc độ render nhanh
+        "-c:a", "aac",           # Render lại audio sang AAC
+        "-ar", "44100",          # Ép tần số âm thanh chuẩn 44.1kHz
+        "-pix_fmt", "yuv420p",   # Đảm bảo tương thích với mọi trình phát
         output_path
     ]
     
     try:
+        # Chạy FFmpeg và in lỗi ra nếu có
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         
         # Xóa file tạm sau khi ghép xong
@@ -98,7 +100,7 @@ def compose_random_video(videos_dir: str, output_path: str, target_duration: flo
         print(f"✅ Ghép thành công! Video lưu tại: {output_path}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Lỗi FFmpeg khi ghép video: {e.stderr}")
+        print(f"❌ Lỗi FFmpeg chi tiết: {e.stderr}")
         if os.path.exists(temp_list_file):
             os.remove(temp_list_file)
         return False
