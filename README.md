@@ -43,6 +43,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 # Cài đặt thư viện
 pip install -r requirements.txt
+
 3. Cấu hình
 Copy file config1.yaml thành config.yaml.
 
