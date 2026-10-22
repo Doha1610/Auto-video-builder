@@ -7,12 +7,13 @@ import time
 import traceback
 import uuid
 import random
+import shutil
 from pathlib import Path
 from typing import Optional
 import yaml
 
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -23,6 +24,7 @@ from backend.sheet_reader import read_sheet, group_by_topic
 from backend.video_composer import compose_random_video
 from backend.tts_engine import text_to_speech
 from backend.downloader import download_all, download_one
+from backend.media_info import get_video_duration
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 AUDIO_DIR = str(BASE_DIR / "audio")
@@ -56,11 +58,6 @@ class ProcessRequest(BaseModel):
     url: str
     model: str = "small"
     language: Optional[str] = None
-
-class RenderRequest(BaseModel):
-    text: str
-    topic: str
-    voice: str = "vi-VN-HoaiMyNeural"
 
 def _new_job() -> str:
     job_id = uuid.uuid4().hex[:8]
@@ -129,7 +126,7 @@ def _run_download_job(job_id):
         log(f"LỖI: {e}")
 
 # ==========================================
-# API CHO TAB TẠO VIDEO (TỰ ĐỘNG TẢI ĐỦ + GHÉP + TRỘN AUDIO)
+# API CHO TAB TẠO VIDEO (TTS hoặc Upload File)
 # ==========================================
 @app.get("/api/topics")
 def get_topics():
@@ -142,30 +139,62 @@ def get_topics():
         return {"topics": []}
 
 @app.post("/api/render-video")
-def render_video(req: RenderRequest):
-    if not req.text.strip():
-        raise HTTPException(status_code=400, detail="Văn bản trống")
-
+def render_video(
+    source_type: str = Form(...),
+    topic: str = Form(...),
+    text: str = Form(None),
+    voice: str = Form(None),
+    audio_file: UploadFile = File(None)
+):
     job_id = _new_job()
-    thread = threading.Thread(target=_run_render_job, args=(job_id, req.text, req.topic, req.voice), daemon=True)
+    
+    saved_audio_path = None
+    # Nếu dùng file âm thanh có sẵn, lưu file vào thư mục tạm
+    if source_type == "file" and audio_file:
+        audio_dir = CONFIG["paths"]["audio_tts_dir"]
+        Path(audio_dir).mkdir(parents=True, exist_ok=True)
+        saved_audio_path = os.path.join(audio_dir, f"uploaded_{job_id}_{audio_file.filename}")
+        
+        with open(saved_audio_path, "wb") as buffer:
+            shutil.copyfileobj(audio_file.file, buffer)
+
+    thread = threading.Thread(
+        target=_run_render_job, 
+        args=(job_id, text, topic, voice, source_type, saved_audio_path), 
+        daemon=True
+    )
     thread.start()
     return {"job_id": job_id}
 
-def _run_render_job(job_id, text, topic, voice):
+def _run_render_job(job_id, text, topic, voice, source_type="text", uploaded_audio_path=None):
     job = JOBS[job_id]
     job["status"] = "running"
     log = lambda msg: _append_log(job_id, msg)
 
     try:
-        # BƯỚC 1: TẠO GIỌNG ĐỌC
-        log(">>> Bước 1: Tạo giọng đọc (TTS)")
-        audio_dir = CONFIG["paths"]["audio_tts_dir"]
-        audio_path, duration = text_to_speech(text, audio_dir, voice)
-        
-        if not audio_path or duration <= 0:
-            raise Exception("Lỗi tạo giọng đọc.")
-        
-        log(f"Đã tạo audio dài {duration:.1f} giây")
+        # BƯỚC 1: LẤY ÂM THANH
+        if source_type == "file" and uploaded_audio_path:
+            log(">>> Bước 1: Sử dụng file âm thanh tải lên")
+            audio_path = uploaded_audio_path
+            
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+            ffprobe_path = os.path.join(cfg["ffmpeg"]["path"], "ffprobe.exe")
+            
+            duration = get_video_duration(audio_path, ffprobe_path)
+            
+            if duration <= 0:
+                raise Exception("Không thể đọc thời lượng file âm thanh.")
+            log(f"File audio dài {duration:.1f} giây")
+        else:
+            log(">>> Bước 1: Tạo giọng đọc (TTS)")
+            audio_dir = CONFIG["paths"]["audio_tts_dir"]
+            audio_path, duration = text_to_speech(text, audio_dir, voice)
+            
+            if not audio_path or duration <= 0:
+                raise Exception("Lỗi tạo giọng đọc.")
+            log(f"Đã tạo audio dài {duration:.1f} giây")
+            
         job["progress"] = 20
 
         # BƯỚC 2: TẢI VỪA ĐỦ SỐ LƯỢNG VIDEO CẦN THIẾT
@@ -187,10 +216,7 @@ def _run_render_job(job_id, text, topic, voice):
         images_dir = CONFIG["paths"]["images_dir"]
         ffmpeg_dir = CONFIG["ffmpeg"]["path"]
         
-        # Tính toán số lượng video cần tải (giả sử mỗi video trung bình 10s)
         estimate_videos_needed = int(duration / 10) + 5 
-        
-        # Xáo trộn danh sách link để lấy ngẫu nhiên
         random.shuffle(items)
         
         log(f"Cần khoảng {estimate_videos_needed} video để đủ {duration:.0f} giây. Bắt đầu tải...")
@@ -199,19 +225,18 @@ def _run_render_job(job_id, text, topic, voice):
         
         for item in items:
             if downloaded_count >= estimate_videos_needed:
-                break # Đã tải đủ số lượng cần thiết thì dừng
+                break
                 
             file_path = download_one(
                 item, 
                 videos_dir=videos_dir, 
                 images_dir=images_dir, 
                 ffmpeg_path=ffmpeg_dir, 
-                skip_if_exists=False # Bắt buộc tải, không bỏ qua
+                skip_if_exists=False
             )
             
             if file_path:
                 downloaded_count += 1
-                # Cập nhật tiến độ từ 30% đến 60%
                 job["progress"] = 30 + int((downloaded_count / estimate_videos_needed) * 30)
         
         if downloaded_count == 0:
@@ -238,7 +263,7 @@ def _run_render_job(job_id, text, topic, voice):
             raise Exception("Lỗi ghép video.")
             
         # BƯỚC 4: TRỘN ÂM THANH VÀO VIDEO
-        log(">>> Bước 4: Tắt tiếng video gốc và chèn giọng đọc")
+        log(">>> Bước 4: Tắt tiếng video gốc và chèn âm thanh")
         job["progress"] = 80
         
         final_video_path = os.path.join(OUTPUT_DIR, f"FINAL_{job_id}.mp4")
@@ -246,13 +271,13 @@ def _run_render_job(job_id, text, topic, voice):
         
         cmd_merge = [
             ffmpeg_exe, "-y",
-            "-i", temp_output_path,  # Input 0: Video gốc (có tiếng ồn)
-            "-i", audio_path,        # Input 1: Giọng đọc
-            "-map", "0:v:0",         # Chỉ lấy hình ảnh của video 0
-            "-map", "1:a:0",         # Chỉ lấy âm thanh của video 1 (giọng đọc)
-            "-c:v", "copy",          # Không render lại hình ảnh
-            "-c:a", "aac",           # Render âm thanh sang AAC
-            "-shortest",             # Dừng khi giọng đọc kết thúc
+            "-i", temp_output_path,  # Input 0: Video gốc
+            "-i", audio_path,        # Input 1: Giọng đọc / File audio
+            "-map", "0:v:0",         
+            "-map", "1:a:0",         
+            "-c:v", "copy",          
+            "-c:a", "aac",           
+            "-shortest",             
             final_video_path
         ]
         
@@ -262,7 +287,7 @@ def _run_render_job(job_id, text, topic, voice):
             print("LỖI FFMPEG:", result.stderr)
             raise Exception("Lỗi FFmpeg khi trộn âm thanh.")
             
-        # Dọn dẹp file video tạm không tiếng
+        # Dọn dẹp file video tạm
         if os.path.exists(temp_output_path):
             os.remove(temp_output_path)
 
