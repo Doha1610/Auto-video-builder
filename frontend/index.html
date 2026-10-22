@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auto Video Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: "#0f172a",
+                        card: "#1e293b",
+                        accent: "#3b82f6",
+                        "accent-hover": "#2563eb",
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['Consolas', 'Monaco', 'monospace'],
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-bg text-slate-200 min-h-screen font-sans">
+
+    <div class="max-w-4xl mx-auto p-6">
+
+        <!-- ============ HEADER & TABS ============ -->
+        <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between border-b border-slate-700 pb-4 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-white flex items-center gap-3">
+                    🎬 Auto Video Studio
+                </h1>
+                <p class="text-slate-400 mt-1 text-sm">
+                    Hệ thống sản xuất video tự động
+                </p>
+            </div>
+            <div class="flex gap-2 bg-slate-800 p-1 rounded-lg">
+                <button id="tab-btn-video" class="px-5 py-2 rounded-md font-semibold bg-accent text-white transition-all">Tạo Video</button>
+                <button id="tab-btn-transcribe" class="px-5 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition-all">Lấy Văn bản</button>
+            </div>
+        </header>
+
+        <!-- ========================================== -->
+        <!-- TAB 1: TẠO VIDEO TỰ ĐỘNG                   -->
+        <!-- ========================================== -->
+        <div id="tab-content-video">
+            
+            <!-- Nút tải video từ Sheet (Gộp vào đây) -->
+            <div class="flex justify-end mb-4">
+                <button id="startDownloadBtn" class="bg-slate-700 hover:bg-slate-600 text-sm text-slate-200 font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                    📥 Tải video mới từ Google Sheet
+                </button>
+            </div>
+
+            <!-- 1. Nhập kịch bản -->
+            <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">1. Nhập kịch bản (Văn bản)</h2>
+                <textarea id="scriptText" rows="5" placeholder="Dán đoạn văn bản cần đọc vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-accent focus:outline-none"></textarea>
+            </section>
+
+            <!-- 2. Cấu hình Video -->
+            <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">2. Cấu hình Video</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5">Chọn Topic (từ Google Sheet)</label>
+                        <select id="videoTopic" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
+                            <option value="">-- Đang tải topic... --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5">Giọng đọc</label>
+                        <select id="voiceType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
+                            <option value="vi-VN-HoaiMyNeural">Nữ - HoaiMy (Miền Nam)</option>
+                            <option value="vi-VN-NamMinhNeural">Nam - NamMinh (Miền Bắc)</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="startRenderBtn" class="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    🚀 Bắt đầu tạo Video
+                </button>
+            </section>
+
+            <!-- Progress và Log cho Tab Tạo Video (Bao gồm cả log tải video) -->
+            <section id="renderProgressSection" class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="renderStatusText" class="text-sm text-slate-300">Đang xử lý...</span>
+                    <span id="renderProgressPct" class="text-sm font-mono text-accent font-semibold">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden mb-4">
+                    <div id="renderProgressBar" class="bg-gradient-to-r from-green-500 to-emerald-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="renderLogBox" class="bg-black/50 rounded-lg p-3 font-mono text-xs text-slate-300 h-48 overflow-y-auto whitespace-pre-wrap"></div>
+            </section>
+
+            <!-- Kết quả Video -->
+            <section id="renderResultSection" class="bg-card rounded-xl p-5 shadow-lg border border-slate-800 hidden">
+                <h2 class="text-sm font-semibold text-green-400 mb-3 uppercase tracking-wider">✅ Video đã hoàn thành!</h2>
+                <video id="finalVideoPlayer" controls class="w-full rounded-lg bg-black mb-4 max-h-[400px]"></video>
+                <a id="downloadVideoBtn" href="#" class="inline-block bg-slate-700 hover:bg-slate-600 text-white font-medium px-5 py-2 rounded-lg transition-colors">
+                    ⬇️ Tải Video (MP4)
+                </a>
+            </section>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: LẤY VĂN BẢN (WHISPER)               -->
+        <!-- ========================================== -->
+        <div id="tab-content-transcribe" class="hidden">
+            
+            <!-- Cấu hình Whisper -->
+            <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">Cấu hình Whisper</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5">Model Whisper</label>
+                        <select id="model" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
+                            <option value="tiny">tiny — nhanh, kém chính xác</option>
+                            <option value="base">base</option>
+                            <option value="small" selected>small — cân bằng</option>
+                            <option value="medium">medium — chậm, chính xác</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5">Ngôn ngữ</label>
+                        <select id="language" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
+                            <option value="">Tự phát hiện</option>
+                            <option value="vi">Tiếng Việt</option>
+                            <option value="en">English</option>
+                            <option value="zh">中文</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- URL -->
+            <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">URL Video</h2>
+                <input id="url" type="text" placeholder="Dán URL YouTube hoặc TikTok vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:border-accent focus:outline-none" />
+                <div class="flex flex-wrap gap-3 mt-4">
+                    <button id="startBtn" class="bg-accent hover:bg-accent-hover text-white font-semibold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        🚀 Bắt đầu
+                    </button>
+                    <button id="openFolderBtn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium px-5 py-2.5 rounded-lg transition-colors">
+                        📁 Mở thư mục output
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress -->
+            <section id="progressSection" class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="statusText" class="text-sm text-slate-300">Đang xử lý...</span>
+                    <span id="progressPct" class="text-sm font-mono text-accent font-semibold">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                    <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-cyan-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </section>
+
+            <!-- Log -->
+            <section id="logSection" class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800 hidden">
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">Log</h2>
+                <div id="logBox" class="bg-black/50 rounded-lg p-3 font-mono text-xs text-slate-300 h-64 overflow-y-auto whitespace-pre-wrap leading-relaxed"></div>
+            </section>
+
+            <!-- Kết quả -->
+            <section id="resultSection" class="bg-card rounded-xl p-5 shadow-lg border border-slate-800 hidden">
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">Kết quả</h2>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <a id="downloadTxt" href="#" class="bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors">
+                        ⬇️ Tải .txt
+                    </a>
+                    <a id="downloadSrt" href="#" class="bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors">
+                        ⬇️ Tải .srt
+                    </a>
+                    <button id="spellCheckBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        ✏️ Kiểm tra chính tả
+                    </button>
+                </div>
+                <textarea id="resultText" readonly placeholder="Kết quả sẽ hiện ở đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 h-64 font-mono text-xs focus:outline-none"></textarea>
+            </section>
+        </div>
+
+        <footer class="text-center text-xs text-slate-500 mt-8">
+            💡 Dữ liệu video được lưu tự động trong thư mục <code class="text-slate-400">data/</code>
+        </footer>
+
+    </div>
+
+    <!-- Đổi version để xóa cache -->
+    <script src="app.js?v=1005"></script>
+</body>
+</html>
