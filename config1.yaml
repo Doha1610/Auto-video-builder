@@ -1,0 +1,27 @@
+paths:
+  data_dir: data
+  downloads_dir: data/downloads
+  videos_dir: data/downloads/videos
+  images_dir: data/downloads/images
+  audio_tts_dir: data/audio_tts
+  video_composed_dir: data/video_composed
+  output_dir: data/output
+  log_dir: logs
+  credentials_dir: credentials
+
+ffmpeg:
+  path: "D:\\ffmpeg-9.0.1-essentials_build\\bin"  # Sửa lại đường dẫn nếu máy bạn khác
+
+google_sheet:
+  sheet_id: "YOUR_GOOGLE_SHEET_ID"
+  tab_name: "Sheet1"
+  credentials_file: "credentials/google-service.json"
+
+aws:
+  access_key: "YOUR_AWS_ACCESS_KEY"
+  secret_key: "YOUR_AWS_SECRET_KEY"
+  region: "ap-southeast-1"
+  bucket: "YOUR_BUCKET_NAME"
+  prefix: "media"
+
+# ... (Các phần còn lại giữ nguyên)
