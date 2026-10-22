@@ -9,8 +9,11 @@ import yt_dlp
 
 
 def _short_hash(text: str) -> str:
-    """Tạo tên file ngắn từ URL, tránh trùng lặp."""
-    return hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
+    """Tạo tên file ngắn từ URL, thêm hậu tố ngẫu nhiên để tránh trùng lặp."""
+    import uuid
+    # Thêm 4 ký tự ngẫu nhiên để đảm bảo tên file không bao giờ trùng
+    random_suffix = uuid.uuid4().hex[:4] 
+    return hashlib.md5(text.encode("utf-8")).hexdigest()[:8] + "_" + random_suffix
 
 
 def _is_youtube(url: str) -> bool:
