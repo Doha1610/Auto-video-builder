@@ -187,26 +187,37 @@ def _run_render_job(job_id, text, topic, voice):
         images_dir = CONFIG["paths"]["images_dir"]
         ffmpeg_dir = CONFIG["ffmpeg"]["path"]
         
-        # Ước lượng số video cần tải (giả sử mỗi video dài 15s, + 2 video dự phòng)
-        estimate_videos_needed = int(duration / 15) + 2 
+        # Tính toán số lượng video cần tải (giả sử mỗi video trung bình 10s)
+        estimate_videos_needed = int(duration / 10) + 5 
         
-        # Xáo trộn để tải ngẫu nhiên
+        # Xáo trộn danh sách link để lấy ngẫu nhiên
         random.shuffle(items)
-        links_to_download = items[:estimate_videos_needed]
         
-        log(f"Cần khoảng {estimate_videos_needed} video. Bắt đầu tải...")
+        log(f"Cần khoảng {estimate_videos_needed} video để đủ {duration:.0f} giây. Bắt đầu tải...")
         
-        for i, item in enumerate(links_to_download):
-            download_one(
+        downloaded_count = 0
+        
+        for item in items:
+            if downloaded_count >= estimate_videos_needed:
+                break # Đã tải đủ số lượng cần thiết thì dừng
+                
+            file_path = download_one(
                 item, 
                 videos_dir=videos_dir, 
                 images_dir=images_dir, 
                 ffmpeg_path=ffmpeg_dir, 
-                skip_if_exists=True
+                skip_if_exists=False # Bắt buộc tải, không bỏ qua
             )
-            job["progress"] = 30 + int(((i+1) / len(links_to_download)) * 30)
+            
+            if file_path:
+                downloaded_count += 1
+                # Cập nhật tiến độ từ 30% đến 60%
+                job["progress"] = 30 + int((downloaded_count / estimate_videos_needed) * 30)
         
-        log("Tải video hoàn tất. Bắt đầu ghép...")
+        if downloaded_count == 0:
+            raise Exception("Không tải được video nào từ Sheet.")
+            
+        log(f"Đã tải xong {downloaded_count} video. Bắt đầu ghép...")
         job["progress"] = 60
 
         # BƯỚC 3: GHÉP VIDEO HÌNH ẢNH
@@ -272,13 +283,11 @@ def download_final_video(job_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="File không tồn tại")
     
-    # Thêm các header để báo cho trình duyệt biết đây là file tĩnh, không cần ngắt kết nối
     return FileResponse(
         path, 
         media_type="video/mp4",
         headers={"Accept-Ranges": "bytes", "Cache-Control": "no-cache"}
     )
-
 
 # ==========================================
 # API CHO TAB WHISPER (LẤY VĂN BẢN)
