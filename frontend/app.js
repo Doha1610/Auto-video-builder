@@ -31,7 +31,25 @@ $("tab-btn-transcribe").addEventListener("click", () => {
 // LOGIC TAB 1: TẠO VIDEO
 // ==========================================
 
-// Xử lý ẩn/hiện khu vực nhập liệu (Text vs File)
+// Xử lý ẩn/hiện khu vực nhập liệu Video (Tự động tạo vs Tải lên)
+document.querySelectorAll('input[name="videoSourceType"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const isUpload = e.target.value === 'upload';
+        if (isUpload) {
+            $('uploadVideoSection').classList.remove('hidden');
+            $('audioSourceWrapper').classList.add('hidden');
+            $('topicWrapper').classList.add('hidden');    // Ẩn chọn Topic
+            $('voiceWrapper').classList.add('hidden');    // Ẩn chọn Giọng đọc
+        } else {
+            $('uploadVideoSection').classList.add('hidden');
+            $('audioSourceWrapper').classList.remove('hidden');
+            $('topicWrapper').classList.remove('hidden'); // Hiện lại
+            $('voiceWrapper').classList.remove('hidden'); // Hiện lại
+        }
+    });
+});
+
+// Xử lý ẩn/hiện khu vực nhập liệu Âm thanh (Text vs File)
 document.querySelectorAll('input[name="audioSource"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
         const textSection = $('textInputSection');
@@ -58,9 +76,9 @@ async function loadTopics() {
         const res = await fetch(`${API}/api/topics`);
         const data = await res.json();
         const select = $("videoTopic");
-        select.innerHTML = '<option value="">-- Chọn Topic --</option>';
+        select.innerHTML = '<option value="" class="text-white">-- Chọn Topic --</option>';
         if (data.topics) {
-            data.topics.forEach(t => select.innerHTML += `<option value="${t}">${t}</option>`);
+            data.topics.forEach(t => select.innerHTML += `<option value="${t}" class="text-white">${t}</option>`);
         }
     } catch (e) { console.error("Lỗi tải topic:", e); }
 }
@@ -105,20 +123,22 @@ $("startDownloadBtn").addEventListener("click", async () => {
 
 // Nút "Bắt đầu tạo Video"
 $("startRenderBtn").addEventListener("click", async () => {
-    const sourceType = document.querySelector('input[name="audioSource"]:checked').value;
+    const videoSourceType = document.querySelector('input[name="videoSourceType"]:checked').value;
+    const audioSource = document.querySelector('input[name="audioSource"]:checked').value;
+    
     const text = $("scriptText").value.trim();
     const topic = $("videoTopic").value;
     const voice = $("voiceType").value;
-    const fileInput = $("audioFileInput");
+    const videoFormat = $("videoFormat").value; 
+    const audioFile = $("audioFileInput").files[0];
+    const rawVideo = $("rawVideoInput").files[0];
 
     // Kiểm tra dữ liệu đầu vào
-    if (sourceType === 'text' && !text) { 
-        alert("Vui lòng nhập kịch bản!"); 
-        return; 
-    }
-    if (sourceType === 'file' && fileInput.files.length === 0) {
-        alert("Vui lòng chọn file audio!");
-        return;
+    if (videoSourceType === 'auto') {
+        if (audioSource === 'text' && !text) { alert("Vui lòng nhập kịch bản!"); return; }
+        if (audioSource === 'file' && !audioFile) { alert("Vui lòng chọn file audio!"); return; }
+    } else if (videoSourceType === 'upload') {
+        if (!rawVideo) { alert("Vui lòng chọn file video tải lên!"); return; }
     }
 
     const btn = $("startRenderBtn");
@@ -132,16 +152,21 @@ $("startRenderBtn").addEventListener("click", async () => {
     lastRenderLog = 0;
 
     try {
-        // Đóng gói dữ liệu vào FormData (để gửi được file)
         const formData = new FormData();
-        formData.append("source_type", sourceType);
-        formData.append("topic", topic);
+        formData.append("source_type", videoSourceType); 
+        formData.append("video_format", videoFormat); 
         
-        if (sourceType === 'text') {
-            formData.append("text", text);
-            formData.append("voice", voice);
+        if (videoSourceType === 'auto') {
+            formData.append("audio_source", audioSource);
+            formData.append("topic", topic);
+            if (audioSource === 'text') {
+                formData.append("text", text);
+                formData.append("voice", voice);
+            } else {
+                formData.append("audio_file", audioFile);
+            }
         } else {
-            formData.append("audio_file", fileInput.files[0]);
+            formData.append("raw_video", rawVideo);
         }
 
         const res = await fetch(`${API}/api/render-video`, {
@@ -150,7 +175,17 @@ $("startRenderBtn").addEventListener("click", async () => {
         });
         
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Lỗi gọi API");
+        
+        // SỬA LỖI [object Object]: Trích xuất thông báo lỗi chi tiết
+        if (!res.ok) {
+            let errorMsg = "Lỗi gọi API";
+            if (data.detail) {
+                if (typeof data.detail === 'string') errorMsg = data.detail;
+                else if (Array.isArray(data.detail)) errorMsg = data.detail.map(d => d.msg).join(", ");
+                else errorMsg = JSON.stringify(data.detail);
+            }
+            throw new Error(errorMsg);
+        }
         
         renderJobId = data.job_id;
         startRenderPolling();

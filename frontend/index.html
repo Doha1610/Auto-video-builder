@@ -57,49 +57,79 @@
                 </button>
             </div>
 
-            <!-- 1. Nguồn âm thanh (Văn bản hoặc File) -->
+            <!-- 1. Nguồn Video & Âm thanh -->
             <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
-                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">1. Nguồn Âm thanh</h2>
+                <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">1. Nguồn Video & Âm thanh</h2>
                 
-                <div class="flex gap-6 mb-4">
+                <!-- Lựa chọn nguồn Video -->
+                <div class="flex gap-6 mb-4 pb-4 border-b border-slate-700">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="audioSource" value="text" checked class="text-accent focus:ring-accent w-4 h-4">
-                        <span class="text-sm font-medium">Tạo giọng đọc (TTS)</span>
+                        <input type="radio" name="videoSourceType" value="auto" checked class="text-accent focus:ring-accent w-4 h-4">
+                        <span class="text-sm font-medium">Tự động tạo từ Google Sheet</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="audioSource" value="file" class="text-accent focus:ring-accent w-4 h-4">
-                        <span class="text-sm font-medium">Tải file Audio có sẵn</span>
+                        <input type="radio" name="videoSourceType" value="upload" class="text-accent focus:ring-accent w-4 h-4">
+                        <span class="text-sm font-medium">Tải video có sẵn lên</span>
                     </label>
                 </div>
 
-                <!-- Khu vực nhập text -->
-                <div id="textInputSection">
-                    <textarea id="scriptText" rows="5" placeholder="Dán đoạn văn bản cần đọc vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-accent focus:outline-none"></textarea>
+                <!-- KHU VỰC TẢI VIDEO LÊN (Ẩn mặc định) -->
+                <div id="uploadVideoSection" class="hidden mb-4">
+                    <label class="block text-xs text-slate-400 mb-1.5">Chọn file Video</label>
+                    <input type="file" id="rawVideoInput" accept="video/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 cursor-pointer"/>
                 </div>
 
-                <!-- Khu vực tải file audio -->
-                <div id="fileInputSection" class="hidden">
-                    <input type="file" id="audioFileInput" accept="audio/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 cursor-pointer"/>
-                    <p class="text-xs text-slate-500 mt-2">Hỗ trợ định dạng .mp3, .wav, .m4a...</p>
+                <!-- KHU VỰC NGUỒN ÂM THANH (Giữ nguyên) -->
+                <div id="audioSourceWrapper">
+                    <div class="flex gap-6 mb-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="audioSource" value="text" checked class="text-accent focus:ring-accent w-4 h-4">
+                            <span class="text-sm font-medium">Tạo giọng đọc (TTS)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="audioSource" value="file" class="text-accent focus:ring-accent w-4 h-4">
+                            <span class="text-sm font-medium">Tải file Audio có sẵn</span>
+                        </label>
+                    </div>
+
+                    <!-- Khu vực nhập text -->
+                    <div id="textInputSection">
+                        <textarea id="scriptText" rows="5" placeholder="Dán đoạn văn bản cần đọc vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white placeholder-slate-500 focus:border-accent focus:outline-none"></textarea>
+                    </div>
+
+                    <!-- Khu vực tải file audio -->
+                    <div id="fileInputSection" class="hidden">
+                        <input type="file" id="audioFileInput" accept="audio/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 cursor-pointer"/>
+                        <p class="text-xs text-slate-500 mt-2">Hỗ trợ định dạng .mp3, .wav, .m4a...</p>
+                    </div>
                 </div>
             </section>
 
             <!-- 2. Cấu hình Video -->
             <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
                 <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">2. Cấu hình Video</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1.5">Chọn Topic (từ Google Sheet)</label>
-                        <select id="videoTopic" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
-                            <option value="">-- Đang tải topic... --</option>
+                
+                <!-- Grid 3 cột -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div id="topicWrapper">
+                        <label class="block text-xs text-slate-400 mb-1.5">Chọn Topic</label>
+                        <select id="videoTopic" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white focus:border-accent focus:outline-none appearance-none">
+                            <option value="" class="text-white">-- Đang tải topic... --</option>
+                        </select>
+                    </div>
+                    <div id="voiceWrapper">
+                        <label class="block text-xs text-slate-400 mb-1.5">Giọng đọc (TTS)</label>
+                        <select id="voiceType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white focus:border-accent focus:outline-none appearance-none">
+                            <option value="clone_ngoc_huyen" class="text-white">Ngọc Huyền (Clone)</option>
+                            <option value="vi-VN-HoaiMyNeural" class="text-white">Nữ - HoaiMy</option>
+                            <option value="vi-VN-NamMinhNeural" class="text-white">Nam - NamMinh</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1.5">Giọng đọc (TTS)</label>
-                        <select id="voiceType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
-                            <option value="clone_ngoc_huyen">Ngọc Huyền (Clone từ file mẫu)</option>
-                            <option value="vi-VN-HoaiMyNeural">Nữ - HoaiMy (Miền Nam)</option>
-                            <option value="vi-VN-NamMinhNeural">Nam - NamMinh (Miền Bắc)</option>
+                        <label class="block text-xs text-slate-400 mb-1.5">Định dạng Video</label>
+                        <select id="videoFormat" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white focus:border-accent focus:outline-none appearance-none">
+                            <option value="tiktok" class="text-white">Dọc 9:16 (TikTok/Reels)</option>
+                            <option value="youtube" class="text-white">Ngang 16:9 (YouTube)</option>
                         </select>
                     </div>
                 </div>
@@ -141,22 +171,22 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1.5">Model Whisper</label>
-                        <select id="model" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
-                            <option value="tiny">tiny — nhanh, kém chính xác</option>
-                            <option value="base">base</option>
-                            <option value="small" selected>small — cân bằng</option>
-                            <option value="medium">medium — chậm, chính xác</option>
+                        <select id="model" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white focus:border-accent focus:outline-none appearance-none">
+                            <option value="tiny" class="text-white">tiny — nhanh, kém chính xác</option>
+                            <option value="base" class="text-white">base</option>
+                            <option value="small" selected class="text-white">small — cân bằng</option>
+                            <option value="medium" class="text-white">medium — chậm, chính xác</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1.5">Ngôn ngữ</label>
-                        <select id="language" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 focus:border-accent focus:outline-none">
-                            <option value="">Tự phát hiện</option>
-                            <option value="vi">Tiếng Việt</option>
-                            <option value="en">English</option>
-                            <option value="zh">中文</option>
-                            <option value="ja">日本語</option>
-                            <option value="ko">한국어</option>
+                        <select id="language" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white focus:border-accent focus:outline-none appearance-none">
+                            <option value="" class="text-white">Tự phát hiện</option>
+                            <option value="vi" class="text-white">Tiếng Việt</option>
+                            <option value="en" class="text-white">English</option>
+                            <option value="zh" class="text-white">中文</option>
+                            <option value="ja" class="text-white">日本語</option>
+                            <option value="ko" class="text-white">한국어</option>
                         </select>
                     </div>
                 </div>
@@ -165,7 +195,7 @@
             <!-- URL -->
             <section class="bg-card rounded-xl p-5 mb-4 shadow-lg border border-slate-800">
                 <h2 class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">URL Video</h2>
-                <input id="url" type="text" placeholder="Dán URL YouTube hoặc TikTok vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:border-accent focus:outline-none" />
+                <input id="url" type="text" placeholder="Dán URL YouTube hoặc TikTok vào đây..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-accent focus:outline-none" />
                 <div class="flex flex-wrap gap-3 mt-4">
                     <button id="startBtn" class="bg-accent hover:bg-accent-hover text-white font-semibold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
                         🚀 Bắt đầu
@@ -218,6 +248,6 @@
     </div>
 
     <!-- Đổi version để xóa cache khi cập nhật code -->
-    <script src="app.js?v=1006"></script>
+    <script src="app.js?v=1010"></script>
 </body>
 </html>
