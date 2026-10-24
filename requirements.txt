@@ -1,21 +1,25 @@
-# ============ CORE ============
-yt-dlp>=2024.10.0
-faster-whisper>=1.0.3
+# Core Web Server
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pyyaml
+python-dotenv
 
-# ============ GOOGLE SHEETS ============
-gspread>=6.0.0
-google-auth>=2.30.0
+# AI & Media Processing
+faster-whisper
+edge-tts
+yt-dlp
+korvatts
+vieneu
+autocorrect
+soundfile
 
-# ============ AWS S3 ============
-boto3>=1.34.0
+# Google Sheets & AWS
+gspread
+google-auth
+boto3
+requests
 
-# ============ HTTP ============
-requests>=2.31.0
-
-# ============ TIỆN ÍCH ============
-pyyaml>=6.0
-python-dotenv>=1.0.0
-tqdm>=4.66.0
-
-# ============ VIDEO/AUDIO ============
-# FFmpeg cài riêng (không qua pip)
+# Utilities
+tqdm
