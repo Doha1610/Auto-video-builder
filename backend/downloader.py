@@ -11,7 +11,6 @@ import yt_dlp
 def _short_hash(text: str) -> str:
     """Tạo tên file ngắn từ URL, thêm hậu tố ngẫu nhiên để tránh trùng lặp."""
     import uuid
-    # Thêm 4 ký tự ngẫu nhiên để đảm bảo tên file không bao giờ trùng
     random_suffix = uuid.uuid4().hex[:4] 
     return hashlib.md5(text.encode("utf-8")).hexdigest()[:8] + "_" + random_suffix
 
@@ -58,7 +57,7 @@ def download_video(
     ffmpeg_path: Optional[str] = None,
     skip_if_exists: bool = True,
 ) -> Optional[str]:
-    """Tải video từ YouTube/TikTok về máy. Trả về đường dẫn file .mp4."""
+    """Tải video và tự động làm mờ nền để chuẩn 9:16."""
     os.makedirs(out_dir, exist_ok=True)
     file_id = _short_hash(url)
 
@@ -83,6 +82,15 @@ def download_video(
 
     if ffmpeg_path:
         opts["ffmpeg_location"] = ffmpeg_path
+        # BỘ LỌC FFMPEG: LÀM MỜ NỀN VÀ CĂN GIỮA VIDEO VỀ CHUẨN 9:16 (1080x1920)
+        vf_filter = (
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:10[bg];"
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+        )
+        opts["postprocessor_args"] = {
+            "ffmpeg": ["-vf", vf_filter]
+        }
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -93,7 +101,7 @@ def download_video(
         base, _ = os.path.splitext(filename)
         mp4_path = base + ".mp4"
         if os.path.exists(mp4_path):
-            print(f"[video] Đã tải: {mp4_path}")
+            print(f"[video] Đã tải và xử lý nền mờ: {mp4_path}")
             return mp4_path
         elif os.path.exists(filename):
             print(f"[video] Đã tải: {filename}")
