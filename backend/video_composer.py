@@ -69,23 +69,21 @@ def compose_random_video(videos_dir: str, output_path: str, target_duration: flo
             else:
                 f.write(f"file '{abs_path}'\n")
     
-    # 4. Gọi FFmpeg để ghép
-    print("[Composer] Đang ghép video bằng FFmpeg (quá trình này có thể mất vài phút)...")
+    # 4. Gọi FFmpeg để ghép (Chỉ ghép thô, KHÔNG ép viền đen)
+    print("[Composer] Đang ghép video bằng FFmpeg...")
     ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe")
     
-    # ÉP BUỘC RENDER LẠI (Re-encode) ĐỂ ĐỒNG NHẤT ÂM THANH VÀ HÌNH ẢNH
-    # Điều này giúp sửa lỗi "Conversion failed" khi video gốc (Facebook/TikTok) bị lỗi codec
     cmd = [
         ffmpeg_exe,
         "-y",                   
         "-f", "concat",         
         "-safe", "0",           
         "-i", temp_list_file,
-        "-c:v", "libx264",       # Render lại video sang H.264
-        "-preset", "fast",       # Tốc độ render nhanh
-        "-c:a", "aac",           # Render lại audio sang AAC
-        "-ar", "44100",          # Ép tần số âm thanh chuẩn 44.1kHz
-        "-pix_fmt", "yuv420p",   # Đảm bảo tương thích với mọi trình phát
+        "-c:v", "libx264",       
+        "-preset", "fast",       
+        "-c:a", "aac",           
+        "-ar", "44100",          
+        # ĐÃ XÓA DÒNG -pix_fmt yuv420p Ở ĐÂY
         output_path
     ]
     
