@@ -1,4 +1,7 @@
 """Bước 6: Chuyển văn bản thành giọng nói (TTS)."""
+import os
+os.environ["HF_HOME"] = r"D:\Auto-video-builder\data\hf_cache"
+os.environ["VIENEU_HOME"] = r"D:\Auto-video-builder\data\vieneu_cache"
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
