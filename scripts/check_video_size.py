@@ -105,3 +105,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+#python scripts/check_video_size.py
