@@ -1,3 +1,6 @@
+import os
+os.environ["HF_HOME"] = r"D:\Auto-video-builder\data\hf_cache"
+os.environ["VIENEU_HOME"] = r"D:\Auto-video-builder\data\vieneu_cache"
 """Xử lý: tải audio + chuyển thành văn bản + kiểm tra chính tả."""
 import os
 from pathlib import Path
@@ -5,9 +8,7 @@ from typing import Callable, Optional
 
 import yt_dlp
 from faster_whisper import WhisperModel
-import os
-os.environ["HF_HOME"] = r"D:\Auto-video-builder\data\hf_cache"
-os.environ["VIENEU_HOME"] = r"D:\Auto-video-builder\data\vieneu_cache"
+
 # Đường dẫn FFmpeg - sửa nếu máy bạn khác
 FFMPEG_PATH = r"D:\ffmpeg-9.0.1-essentials_build\bin"
 
@@ -160,3 +161,4 @@ def transcribe_audio(
                 log_fn(f"[whisper] {seg.end:.0f}s / {info.duration:.0f}s ({pct*100:.1f}%)")
 
     return " ".join(all_text), "\n".join(srt_lines)
+#python scripts/check_video_size.py
