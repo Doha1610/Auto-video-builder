@@ -139,7 +139,7 @@ def get_topics():
 
 @app.post("/api/render-video")
 def render_video(
-    source_type: str = Form(...), # "auto" hoặc "upload"
+    source_type: str = Form(...), 
     video_format: str = Form("tiktok"),
     audio_source: str = Form("text"),
     topic: str = Form(None),    
@@ -184,7 +184,6 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
         ffmpeg_dir = CONFIG["ffmpeg"]["path"]
         ffmpeg_exe = os.path.join(ffmpeg_dir, "ffmpeg.exe")
         
-        # Đường dẫn tuyệt đối của background.png
         background_path = os.path.abspath("background.png") 
         has_bg = os.path.exists(background_path)
         
@@ -195,7 +194,6 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
             log(">>> Bước 1: Xử lý video tải lên và ghép nền")
             
             if video_format == "youtube":
-                # Ngang 16:9
                 log("Đang render video ngang 16:9...")
                 if has_bg:
                     cmd = [
@@ -212,7 +210,6 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
                         "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", final_video_path
                     ]
             else:
-                # Dọc 9:16
                 log("Đang render video dọc 9:16...")
                 if has_bg:
                     cmd = [
@@ -314,16 +311,25 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
         log(f">>> Bước 4: Trộn âm thanh và xuất video {video_format.upper()}")
         job["progress"] = 80
         
+        # Ép FFmpeg làm sạch âm thanh (chuyển sang WAV) để tránh lỗi codec
+        cleaned_audio_path = os.path.join(OUTPUT_DIR, f"clean_{job_id}.wav")
+        cmd_clean = [
+            ffmpeg_exe, "-y", "-i", audio_path,
+            "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1",
+            cleaned_audio_path
+        ]
+        subprocess.run(cmd_clean, capture_output=True, text=True)
+        
         if video_format == "youtube":
             log("Đang render video ngang 16:9 cho YouTube...")
             if has_bg:
                 cmd_merge = [
                     ffmpeg_exe, "-y",
-                    "-loop", "1", "-i", background_path, 
+                    "-err_detect", "ignore_err",
+                    "-loop", "1", "-i", background_path,  
                     "-i", temp_output_path,               
-                    "-i", audio_path,                     
+                    "-i", cleaned_audio_path,             
                     "-filter_complex", 
-                    # Đã thêm scale cho ảnh nền để tiết kiệm RAM
                     "[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080[bg];[1:v]scale=1920:1080:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto[outv]",
                     "-map", "[outv]", "-map", "2:a:0",
                     "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-shortest", 
@@ -331,7 +337,7 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
                 ]
             else:
                 cmd_merge = [
-                    ffmpeg_exe, "-y", "-i", temp_output_path, "-i", audio_path,
+                    ffmpeg_exe, "-y", "-err_detect", "ignore_err", "-i", temp_output_path, "-i", cleaned_audio_path,
                     "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black",
                     "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-shortest", 
                     final_video_path
@@ -341,11 +347,11 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
             if has_bg:
                 cmd_merge = [
                     ffmpeg_exe, "-y",
+                    "-err_detect", "ignore_err",
                     "-loop", "1", "-i", background_path,  
                     "-i", temp_output_path,               
-                    "-i", audio_path,                     
+                    "-i", cleaned_audio_path,             
                     "-filter_complex", 
-                    # Đã thêm scale cho ảnh nền để tiết kiệm RAM
                     "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[1:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto[outv]",
                     "-map", "[outv]", "-map", "2:a:0",
                     "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-shortest", 
@@ -353,7 +359,7 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
                 ]
             else:
                 cmd_merge = [
-                    ffmpeg_exe, "-y", "-i", temp_output_path, "-i", audio_path,
+                    ffmpeg_exe, "-y", "-err_detect", "ignore_err", "-i", temp_output_path, "-i", cleaned_audio_path,
                     "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black",
                     "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-shortest", 
                     final_video_path
@@ -361,6 +367,10 @@ def _run_render_job(job_id, text, topic, voice, source_type, audio_source, uploa
         
         result = subprocess.run(cmd_merge, capture_output=True, text=True)
         
+        # Dọn dẹp file audio tạm
+        if os.path.exists(cleaned_audio_path):
+            os.remove(cleaned_audio_path)
+
         if result.returncode != 0:
             print("LỖI FFMPEG:", result.stderr)
             raise Exception("Lỗi FFmpeg khi trộn âm thanh và xuất video.")
